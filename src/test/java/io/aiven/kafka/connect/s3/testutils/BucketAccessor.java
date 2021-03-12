@@ -103,6 +103,10 @@ public class BucketAccessor {
             .collect(Collectors.toList());
     }
 
+    public final byte[] readBytes(final String blobName) throws IOException {
+        return s3.getObject(bucketName, blobName).getObjectContent().readAllBytes();
+    }
+
     public final List<String> readLines(final String blobName, final String compression) throws IOException {
         Objects.requireNonNull(blobName, "blobName cannot be null");
         final byte[] blobBytes = s3.getObject(bucketName, blobName).getObjectContent().readAllBytes();
