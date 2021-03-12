@@ -26,7 +26,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.zip.GZIPOutputStream;
 
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
@@ -38,19 +37,14 @@ import io.aiven.kafka.connect.common.config.FilenameTemplateVariable;
 import io.aiven.kafka.connect.common.grouper.RecordGrouper;
 import io.aiven.kafka.connect.common.grouper.RecordGrouperFactory;
 import io.aiven.kafka.connect.common.output.OutputWriter;
-import io.aiven.kafka.connect.common.output.jsonwriter.JsonLinesOutputWriter;
-import io.aiven.kafka.connect.common.output.jsonwriter.JsonOutputWriter;
-import io.aiven.kafka.connect.common.output.plainwriter.PlainOutputWriter;
 import io.aiven.kafka.connect.common.templating.VariableTemplatePart;
 import io.aiven.kafka.connect.s3.config.AwsCredentialProviderFactory;
 import io.aiven.kafka.connect.s3.config.S3SinkConfig;
 
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
-import com.github.luben.zstd.ZstdOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.xerial.snappy.SnappyOutputStream;
 
 import static com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration;
 
@@ -97,19 +91,6 @@ public class S3SinkTask extends SinkTask {
         }
     }
 
-    private OutputWriter getOutputWriter(final OutputStream outputStream) {
-        switch (this.config.getFormatType()) {
-            case CSV:
-                return new PlainOutputWriter(config.getOutputFields(), outputStream);
-            case JSONL:
-                return new JsonLinesOutputWriter(config.getOutputFields(), outputStream);
-            case JSON:
-                return new JsonOutputWriter(config.getOutputFields(), outputStream);
-            default:
-                throw new ConnectException("Unsupported format type " + config.getFormatType());
-        }
-    }
-
     @Override
     public void put(final Collection<SinkRecord> records) throws ConnectException {
         Objects.requireNonNull(records, "records cannot be null");
@@ -129,12 +110,14 @@ public class S3SinkTask extends SinkTask {
             return;
         }
         final SinkRecord sinkRecord = records.get(0);
-        try (final OutputStream compressedStream = newStreamFor(filename, sinkRecord)) {
-            try (final OutputWriter outputWriter = getOutputWriter(compressedStream)) {
-                for (final SinkRecord record: records) {
-                    outputWriter.writeRecord(record);
-                }
-            }
+        try (final var out = newStreamFor(filename, sinkRecord);
+             final var outputWriter =
+                     OutputWriter.builder()
+                             .withCompressionType(config.getCompressionType())
+                             .withExternalProperties(config.originalsStrings())
+                             .withOutputFields(config.getOutputFields())
+                             .build(out, config.getFormatType())) {
+            outputWriter.writeRecords(records);
         } catch (final IOException e) {
             throw new ConnectException(e);
         }
@@ -152,14 +135,8 @@ public class S3SinkTask extends SinkTask {
     }
 
     private OutputStream newStreamFor(final String filename, final SinkRecord record) {
-
         final var fullKey = config.usesFileNameTemplate() ? filename : oldFullKey(record);
-        final var awsOutputStream = new S3OutputStream(s3Client, config.getAwsS3BucketName(), fullKey);
-        try {
-            return getCompressedStream(awsOutputStream);
-        } catch (final IOException e) {
-            throw new ConnectException(e);
-        }
+        return new S3OutputStream(s3Client, config.getAwsS3BucketName(), fullKey);
     }
 
     private EndpointConfiguration newEndpointConfiguration(final S3SinkConfig config) {
@@ -167,21 +144,6 @@ public class S3SinkTask extends SinkTask {
             return null;
         }
         return new EndpointConfiguration(config.getAwsS3EndPoint(), config.getAwsS3Region().getName());
-    }
-
-    private OutputStream getCompressedStream(final OutputStream outputStream) throws IOException {
-        Objects.requireNonNull(outputStream, "outputStream cannot be null");
-
-        switch (config.getCompressionType()) {
-            case ZSTD:
-                return new ZstdOutputStream(outputStream);
-            case GZIP:
-                return new GZIPOutputStream(outputStream);
-            case SNAPPY:
-                return new SnappyOutputStream(outputStream);
-            default:
-                return outputStream;
-        }
     }
 
     private String oldFullKey(final SinkRecord record) {
