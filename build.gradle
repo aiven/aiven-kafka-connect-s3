@@ -74,11 +74,11 @@ ext {
     confluentPlatformVersion = "4.1.4"
     amazonS3Version = "1.11.718"
     amazonSTSVersion = "1.11.718"
-    slf4jVersion = "1.7.25"
-    aivenConnectCommonsVersion = "0.4.0"
+    slf4jVersion = "1.7.30"
+    aivenConnectCommonsVersion = "0.5.0-SNAPSHOT"
     junitVersion = "5.6.2"
-    testcontainersVersion = "1.15.1"
-    localstackVersion = "0.2.5"
+    testcontainersVersion = "1.14.3"
+    localstackVersion = "0.2.10"
 }
 
 sourceSets {
@@ -145,7 +145,52 @@ dependencies {
     integrationTestImplementation "org.testcontainers:kafka:$testcontainersVersion" // this is not Kafka version
     integrationTestImplementation "io.confluent:kafka-avro-serializer:$confluentPlatformVersion"
     integrationTestImplementation "io.confluent:kafka-connect-avro-converter:$confluentPlatformVersion"
+
     integrationTestImplementation "org.apache.avro:avro:1.8.1"
+
+    integrationTestImplementation "io.aiven:aiven-kafka-connect-commons:$aivenConnectCommonsVersion"
+
+    testImplementation ("org.apache.parquet:parquet-tools:1.11.1") {
+        exclude group: "org.slf4j", module: "slf4j-api"
+    }
+    testImplementation("org.apache.hadoop:hadoop-mapreduce-client-core:3.3.0") {
+        exclude group: "org.apache.hadoop", module: "hadoop-yarn-client"
+        exclude group: "org.apache.hadoop.thirdparty", module: "hadoop-shaded-protobuf_3_7"
+        exclude group: "com.google.guava", module: "guava"
+        exclude group: "commons-cli", module: "commons-cli"
+        exclude group: "org.apache.commons", module: "commons-math3"
+        exclude group: "org.apache.httpcomponents", module: "httpclient"
+        exclude group: "commons-codec", module: "commons-codec"
+        exclude group: "commons-io", module: "commons-io"
+        exclude group: "commons-net", module: "commons-net"
+        exclude group: "org.eclipse.jetty"
+        exclude group: "org.eclipse.jetty.websocket"
+        exclude group: "javax.servlet"
+        exclude group: "javax.servlet.jsp"
+        exclude group: "javax.activation"
+        exclude group: "com.sun.jersey"
+        exclude group: "log4j"
+        exclude group: "org.apache.commons", module: "commons-text"
+        exclude group: "org.slf4j", module: "slf4j-api"
+        exclude group: "org.apache.hadoop", module: "hadoop-auth"
+        exclude group: "org.apache.hadoop", module: "hadoop-yarn-api"
+        exclude group: "com.google.re2j"
+        exclude group: "com.google.protobuf"
+        exclude group: "com.google.code.gson"
+        exclude group: "com.jcraft"
+        exclude group: "org.apache.curator"
+        exclude group: "org.apache.zookeeper"
+        exclude group: "org.apache.htrace"
+        exclude group: "com.google.code.findbugs"
+        exclude group: "org.apache.kerby"
+        exclude group: "com.fasterxml.jackson.core"
+        exclude group: "com.fasterxml.woodstox", module: "woodstox-core:5.0.3"
+        exclude group: "org.apache.avro", module: "avro"
+        exclude group: "org.apache.hadoop", module: "hadoop-yarn-common"
+        exclude group: "com.google.inject.extensions", module: "guice-servlet"
+        exclude group: "io.netty", module: "netty"
+    }
+
     // Make test utils from 'test' available in 'integration-test'
     integrationTestImplementation sourceSets.test.output
 
